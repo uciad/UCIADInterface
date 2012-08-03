@@ -1,0 +1,344 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>UCIAD Personal Web Analytics Dashboard</title>
+<script type="text/javascript" src="js/sparql.js"> </script>
+<script type="text/javascript" src="js/tagcloud.js"> </script>
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+<script type="text/javascript" src="js/show-chart.js"> </script>
+<script type="text/javascript" src="js/show-map.js"> </script>
+<script src="http://maps.google.com/maps/api/js?sensor=false" type="text/javascript"></script>
+  <style type="text/css">
+#main {
+font-family: Helvetica;
+background: #DDDDAA;
+}
+
+.box {
+background: #FFFFFF;
+padding: 10px 10px 10px 10px;
+-moz-border-radius: 15px;
+border-radius: 15px;
+}
+
+.box h3 {
+background: #FFFFFF;
+}
+
+td{
+vertical-align: top;
+}
+
+</style>
+</head>
+
+<body>
+
+<div ID="main" style="padding: 20px 20px 20px 20px">
+
+<table>
+<tr>
+<td>
+<div class="box" ID="activities">
+  <h3>Activities</h3>
+  <div ID="activities_content">
+  </div>
+</div>
+</td>
+<td>
+<div class="box" ID="pages">
+  <h3>Pages</h3>
+  <div ID="pages_content">
+  </div>
+</div>
+</td>
+</tr><tr>
+<td>
+<div class="box" ID="computers" style="height: 420px;">
+  <h3>Locations</h3>
+  <div id="map" style="width: 500px; height: 350px;"></div>
+</div>
+</td>
+<td>
+<div class="box" ID="agents" style="height: 420px;">
+  <h3>Browsers</h3>
+  <div ID="browsers_content">
+  </div>
+  <h3>OSs</h3>
+  <div ID="oss_content">
+  </div>
+</div>
+</td>
+</tr><tr>
+<td>
+<div class="box" ID="time">
+  <h3>Days</h3>
+  <div ID="days_content">
+  </div>
+</div>
+</td>
+<td>
+<div class="box" ID="formats">
+  <h3>Hours</h3>
+  <div ID="hours_content">
+  </div>
+</div>
+</div>
+</td>
+</tr></table>
+
+ <script type="text/javascript">
+
+a = gup("a");
+if (!a) {
+   window.location.href=window.location.href+"?a=1";   
+}
+
+var prefix = new Array();
+
+var endpoint = "http://localhost:3030/uciad/query";
+
+
+pagefilter = "";
+pagef = gup("page");
+if (pagef){
+   pagefilter = '?x <http://uciad.info/ontology/trace/hasPageInvolved> ?fpi. ?fpi <http://uciad.info/ontology/sitemap/url> "'+unescape(pagef)+'".';
+}
+browserfilter = "";
+browserf = gup("browser");
+if (browserf){
+       browserfilter = '?x <http://uciad.info/ontology/trace/hasSetting> ?fhs. ?fhs <http://uciad.info/ontology/actor/hasAgent> ?fag. ?fag <http://uciad.info/ontology/browser> <http://uciad.info/ontology/webactivity.owl#'+browserf+'>.';
+}
+osfilter = "";
+osf = gup("os");
+if (osf){
+	       osfilter = '?x <http://uciad.info/ontology/trace/hasSetting> ?fhs. ?fhs <http://uciad.info/ontology/actor/hasAgent> ?fag. ?fag <http://uciad.info/ontology/os> <http://uciad.info/ontology/webactivity.owl#'+osf+'>.';
+}
+hourfilter = "";
+hourf = gup("hour");
+if (hourf){
+	       hourfilter = '?x <http://uciad.info/ontology/atHour> "'+hourf+'"^^<http://www.w3.org/2001/XMLSchema#int>.';
+}
+dayfilter = "";
+dayf = gup("day");
+if (dayf){
+	       dayfilter = '?x <http://uciad.info/ontology/onDayOfWeek> <http://uciad.info/ontology/webactivity.owl#'+dayf+'>.';
+}
+activityfilter = "";
+activityf = gup("activity");
+if (activityf){
+	       activityfilter = '?x a <http://uciad.info/ontology/trace/'+activityf+'>.';
+}
+locationfilter="";
+latf = gup("lat");
+longf = gup("long");
+if (longf && latf){
+    locationfilter = '?x <http://uciad.info/ontology/trace/hasSetting> ?fhs. ?fhs <http://uciad.info/ontology/actor/fromComputer> ?ffc. ?ffc <http://uciad.info/ontology/actor/hasGeoCoordinates> "'+latf+','+longf+'"^^<http://www.w3.org/2001/XMLSchema#string>.';
+}
+
+  var aquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+     osfilter+
+     hourfilter+			  
+     dayfilter+
+activityfilter+
+locationfilter+
+     "?x a ?cat."+
+     "?cat <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://uciad.info/ontology/trace/Trace>."+
+     'FILTER (str(?cat) != "http://uciad.info/ontology/trace/Trace")'+
+     "} group by ?cat order by ?cat";
+
+
+  var options = {'colors':['444444', '225555','4444AA', 'AA4444', '44AA44', '44AAAA', 'AA44AA', 'AAAA44', 'AAAAAA', '555522', '552255', '225555'], 'width':500,'height':300, 'legend':{'position': 'left', 'width':200}, 'chartArea':{'left':50, 'top':0, 'right':50, 'bottom':0, 'height':300, 'width':400}};
+  createGraph(endpoint, aquery, 2, "activities_content", 0, options, "activity");
+
+  var pquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+	   pagefilter+
+           browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?pi <http://uciad.info/ontology/sitemap/url> ?cat."+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>"+
+     "} group by ?cat order by desc(?n) limit 20";
+
+  options = {'colors':['4444AA'],'width':500,'height':300, 'legend':{'position': 'none'}, 'chartArea':{'left':180, 'top':0, 'right':0, 'bottom':0, 'height':300}};
+  createGraph(endpoint, pquery, 1, "pages_content", 0, options, "page");
+
+  var lquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?x <http://uciad.info/ontology/trace/hasSetting> ?hs."+
+       "?hs <http://uciad.info/ontology/actor/fromComputer> ?fc."+
+       "?fc <http://uciad.info/ontology/actor/hasGeoCoordinates> ?cat."+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>"+
+     "} group by ?cat order by desc(?n) limit 20";
+
+
+  // createGraph(endpoint, lquery, 1, 500, 500, "computers_content", 0, "loc");
+
+ var mquery = 
+	"select distinct ?cat (count(?x) as ?n) where {"+ 
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+	"?x <http://uciad.info/ontology/trace/hasSetting> ?hs. "+
+	"?hs <http://uciad.info/ontology/actor/fromComputer> ?fc. "+
+	"?fc <http://uciad.info/ontology/actor/hasGeoCoordinates> ?cat"+
+	"} group by ?cat order by desc(?n) limit 20";
+
+  createMap(endpoint, lquery, 1, 500, 500, "map");
+
+  var agquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?x <http://uciad.info/ontology/trace/hasSetting> ?hs."+
+       "?hs <http://uciad.info/ontology/actor/hasAgent> ?ag."+
+       "?ag <http://uciad.info/ontology/browser> ?cat."+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>"+
+     "} group by ?cat order by desc(?n) limit 10";
+
+
+  options = {'colors':['4444AA'], 'width':500,'height':150, 'legend':{'position': 'none'}, 'chartArea':{'left':100, 'top':0, 'right':0, 'bottom':0, 'height':150}};
+  createGraph(endpoint, agquery, 1, "browsers_content", 0, options, "browser");
+
+  var osquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?x <http://uciad.info/ontology/trace/hasSetting> ?hs."+
+       "?hs <http://uciad.info/ontology/actor/hasAgent> ?ag."+
+       "?ag <http://uciad.info/ontology/os> ?cat."+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>"+
+     "} group by ?cat order by desc(?n) limit 10";
+
+
+  options = {'colors':['4444AA'], 'width':500,'height':150, 'legend':{'position': 'none'}, 'chartArea':{'left':100, 'top':0, 'right':0, 'bottom':0, 'height':150}};
+  createGraph(endpoint, osquery, 1, "oss_content", 0, options, "os");
+
+  var tquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?x <http://uciad.info/ontology/atHour> ?cat."+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>"+
+     "} group by ?cat order by ?cat limit 20";
+
+  options = {'colors':['4444AA'], 'width':500,'height':200, 'legend':{'position': 'none'}, 'chartArea':{'left':0, 'top':0, 'right':0, 'bottom':50, 'height':150, 'width':500}};
+  createGraph(endpoint, tquery, 4, "hours_content", 2, options, "hour");
+
+  var fquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?x <http://uciad.info/ontology/onDayOfWeek> ?cat."+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>"+
+     "} group by ?cat order by ?cat limit 20";
+
+  options = {'colors':['4444AA'], 'width':500,'height':200, 'legend':{'position': 'none'}, 'chartArea':{'left':0, 'top':0, 'right':0, 'bottom':50, 'height':150, 'width':500}};
+  createGraph(endpoint, fquery, 4, "days_content", 1, options, "day");
+
+  var foquery = 
+     "select distinct ?cat (count(?x) as ?n) where {"+
+     pagefilter+
+     browserfilter+
+			   osfilter+
+hourfilter+
+dayfilter+
+activityfilter+
+locationfilter+
+       "?x <http://uciad.info/ontology/trace/hasPageInvolved> ?pi."+
+       "?pi a <http://uciad.info/ontology/sitemap/ContentPage>."+
+       "?pi a ?cat"+							   
+     "} group by ?cat order by ?cat limit 20";
+
+							   
+//createGraph(endpoint, foquery, 4, 500, 300, "formats_content", 0);
+
+function gup( name )
+{
+  name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+  var regexS = "[\\?&]"+name+"=([^&#]*)";
+  var regex = new RegExp( regexS );
+  var results = regex.exec( window.location.href );
+  if( results == null )
+    return "";
+  else
+    return results[1];
+}
+
+function getLabel(uri, elem){
+    var sparqler = new SPARQL.Service(endpoint);
+    var query = sparqler.createQuery();
+    var squery = 'select ?l where {<'+uri+'> <http://www.w3.org/2000/01/rdf-schema#label> ?l}';
+//alert("query = "+squery);
+    query.query(squery, {failure: failed, success:
+    function(json){setLabel(json, elem)}});
+}
+
+function failed(){
+     alert("query failed");       
+ }
+
+function setLabel(json, elem){
+  // need to check that there is actually something here...
+ if (json!=null){
+    document.getElementById(elem).innerHTML=json['results']['bindings'][0]['l']['value'];
+ }
+}
+
+function getFragment(uri){
+    if (uri.indexOf("http")!=0) return uri;
+   var ind = uri.lastIndexOf("#")+1;
+   if (ind!=0) return uri.substring(ind);
+   var ind = uri.lastIndexOf("/")+1;
+   if (ind == uri.length) return uri;
+   return uri.substring(ind);
+}
+
+
+ </script>
+
+
+</body> </html>
